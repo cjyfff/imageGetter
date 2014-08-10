@@ -1,18 +1,19 @@
 #! /usr/bin/env python
 #coding=utf-8
 #author: cjyfff -- https://github.com/cjyfff
-import gevent.monkey
-gevent.monkey.patch_socket()
 
 import re
 import urllib
-import gevent
 import sys
+import threading
 
 count = 1
+pre_spec_name = 1
+MAX_THREADING = 4
 
 message = {
-'opt_msg': '''Enter 1 to input an url, or enter 2 to open a html file: ''',
+'opt_msg': '''*********************************************************
+Enter 1 to input an url, or enter 2 to open a html file: ''',
 'url_msg': '''*********************************************************
 Enter the url which is contained the images: ''',
 'file_dir_msg': '''*********************************************************
@@ -72,36 +73,47 @@ def get_picture_url(content, reg, prefix):
 
 def print_counting():
     global count
-    print "%d picture saved" % count
+    print "%d pictures saved" % count
     count += 1
 
 
-def save(list, spec_name, save_dir):
+def save_thread(list, spec_name, save_dir):
+    global pre_spec_name
 
-    def save_thread(item, spec_name, i, save_dir):
-        # 'spec_name' stand for specified name of the pictures
-        if spec_name:
-            urllib.urlretrieve(item['url'], print_counting() + '%s.jpg' % spec_name + str(i))
-            print_counting()
-        else:
-            urllib.urlretrieve(item['url'], save_dir + item['name'])
-            print_counting()
+    for item in list:
+        try:
+            # 'spec_name' stand for specified name of the pictures
+            if spec_name:
+                urllib.urlretrieve(item['url'], save_dir + '%s.jpg' % spec_name + str(pre_spec_name))
+                print_counting()
+                pre_spec_name += 1
+            else:
+                urllib.urlretrieve(item['url'], save_dir + item['name'])
+                print_counting()
+        except IOError:
+            print "You have no permission to save files in the specified path, Choose another path please."
+            sys.exit(0)
+        except KeyboardInterrupt:
+            print "Download abort, existing..."
+            sys.exit(0)
+
+
+def save_picture(pic_url_list, spec_name, save_dir):
+
+    border = len(pic_url_list) / MAX_THREADING
 
     threads = []
     i = 0
-    for item in list:
-        threads.append(gevent.spawn(save_thread, item, spec_name, i, save_dir))
-        i += 1
+    while i < len(pic_url_list):
+        t1 = threading.Thread(target=save_thread, args=(pic_url_list[i:border], spec_name, save_dir))
+        threads.append(t1)
+        i = border
+        border += border
 
-    gevent.joinall(threads)
-
-
-def save_picture(pic_url_list, spec_name=None, save_dir=''):
-
-    try:
-        save(pic_url_list, spec_name, save_dir)
-    except IOError:
-        print "You have no permission to save file in the specified directory, Choose another directory."
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
 
 
 def main(opt='', url='', reg='', prefix='', file_dir='', spec_name='', save_dir=''):
@@ -111,7 +123,7 @@ def main(opt='', url='', reg='', prefix='', file_dir='', spec_name='', save_dir=
     else:
         content = get_file(file_dir)
     pic_url_list = get_picture_url(content, reg, prefix)
-    save_picture(pic_url_list, spec_name=spec_name, save_dir=save_dir)
+    save_picture(pic_url_list, spec_name, save_dir)
     print "Completed!"
 
 
@@ -120,34 +132,37 @@ if __name__ == '__main__':
     try:
         url = ''
         file_dir = ''
+        try:
+            from settings import *
+            print "load setting file successfully."
+        except IOError:
+            print message['opt_msg']
+            opt = raw_input("> ")
+            if opt == '1':
+                print message['url_msg']
+                url = raw_input("> ")
+            elif opt == '2':
+                print message['file_dir_msg']
+                file_dir = raw_input("> ")
+            else:
+                print "Error input!"
+                sys.exit(1)
 
-        print message['opt_msg']
-        opt = raw_input("> ")
-        if opt == '1':
-            print message['url_msg']
-            url = raw_input("> ")
-        elif opt == '2':
-            print message['file_dir_msg']
-            file_dir = raw_input("> ")
-        else:
-            print "Error input!"
-            sys.exit(1)
+            if not (url or file_dir):
+                print "Error input!"
+                sys.exit(1)
 
-        if not (url or file_dir):
-            print "Error input!"
-            sys.exit(1)
+            print message['reg_msg']
+            reg = r'%s' % raw_input("> ")
 
-        print message['reg_msg']
-        reg = r'%s' % raw_input("> ")
+            print message['prefix_msg']
+            prefix = raw_input("> ")
 
-        print message['prefix_msg']
-        prefix = raw_input("> ")
+            print message['save_dir_msg']
+            save_dir = raw_input("> ")
 
-        print message['save_dir_msg']
-        save_dir = raw_input("> ")
-
-        print message['spec_name_msg']
-        spec_name = raw_input("> ")
+            print message['spec_name_msg']
+            spec_name = raw_input("> ")
 
         main(opt=opt, url=url, file_dir=file_dir, prefix=prefix, reg=reg, spec_name=spec_name, save_dir=save_dir)
     except KeyboardInterrupt:
