@@ -9,7 +9,7 @@ import threading
 
 count = 1
 pre_spec_name = 1
-MAX_THREADING = 4
+MAX_THREADING = 5
 
 message = {
 'opt_msg': '''*********************************************************
@@ -97,8 +97,8 @@ def save_thread(list, spec_name, save_dir):
                 urllib.urlretrieve(item['url'], save_dir + item['name'])
                 print_counting()
         except IOError:
-            print "You have no permission to save files in the specified path, Choose another path please."
-            sys.exit(0)
+            print "You have no permission to save files in the specified path."
+            continue
         except KeyboardInterrupt:
             print "Download abort, existing..."
             sys.exit(0)
@@ -106,15 +106,17 @@ def save_thread(list, spec_name, save_dir):
 
 def save_picture(pic_url_list, spec_name, save_dir):
 
-    border = len(pic_url_list) / MAX_THREADING
+    border = len(pic_url_list) / (MAX_THREADING - 1)
 
     threads = []
     i = 0
+    j = border
     while i < len(pic_url_list):
-        t1 = threading.Thread(target=save_thread, args=(pic_url_list[i:border], spec_name, save_dir))
-        threads.append(t1)
-        i = border
-        border += border
+        t = threading.Thread(target=save_thread,
+                              args=(pic_url_list[i: j], spec_name, save_dir))
+        threads.append(t)
+        i = j
+        j += border
 
     for t in threads:
         t.start()
@@ -172,6 +174,6 @@ if __name__ == '__main__':
             print message['spec_name_msg']
             spec_name = raw_input("> ")
 
-        main(opt=opt, url=url, file_dir=file_dir, prefix=prefix, reg=reg, spec_name=spec_name, save_dir=save_dir)
+        main(opt, url, reg, prefix, file_dir, spec_name, save_dir)
     except KeyboardInterrupt:
         print "Bye."
