@@ -1,11 +1,7 @@
 var picURL = 'http://tieba.baidu.com/p/2509293132#!/l/p1';
-// var picURL = 'http://www.cnblogs.com/Fooo/archive/2011/10/13/2209581.html';
 var jqURL = 'http://libs.baidu.com/jquery/2.0.0/jquery.js';
 
 var page = require('webpage').create();
-// var fs = require('fs');
-// var path = 'output.txt';
-// fs.touch(path);
 
 page.onError = function(msg, trace) {
 	var msgStack = ['ERROR: ' + msg];
