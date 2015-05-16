@@ -1,119 +1,92 @@
 #! /usr/bin/env python
-#coding=utf-8
-#author: cjyfff -- https://github.com/cjyfff
+# coding=utf-8
+# author: cjyfff -- https://github.com/cjyfff
 
-import re
 import urllib
 import sys
 import threading
+import os
+import settings
 
-count = 1
-pre_spec_name = 1
-MAX_THREADING = 5
-
-message = {
-'opt_msg': '''*********************************************************
-Enter 1 to input an url, or enter 2 to open a html file: ''',
-
-'url_msg': '''*********************************************************
-Enter the url which is contained the images: ''',
-
-'file_dir_msg': '''*********************************************************
-Enter the path of the html file: ''',
-
-'reg_msg': '''*********************************************************
-Enter the regular to match the images, such like: http://imgsrc\.aaa\.com/forum/w%.*?\.jpg''',
-
-'prefix_msg': '''*********************************************************
-Sometime we are visiting a page that is showing the thumbnails, and we want to
-download the real images which are relate to these thumbnails, then we need to
-enter the prefix of the real url. For example, the thumbnails url is www.aaa.com/thumb/111.jpg',
-the real image url is 'www.aaa.com/images/111.jpg', so we need to enter the prefix 'www.abc.com/images/',
-this script will download the real image. If the images in the current page is not an thumbnails,
-or you just want to download thumbnails, you just need to enter nothing. ''',
-
-'save_dir_msg': '''*********************************************************
-Enter the path you want to save the images, enter nothing to save in the current path: ''',
-
-'spec_name_msg': '''*********************************************************
-Enter the name you want to named the images.
-If you enter 'football', the images will be save as 'football1.jpg', 'football2.jpg'...etc.
-Enter nothing to save images with the origin name specified in the url.
-''',
-}
+count = 0
 
 
-def get_html_content(url):
-    page = urllib.urlopen(url)
-    content = page.read()
-    return content
+class ErrorHandler(object):
+
+    @staticmethod
+    def access_error(msg='Access error!'):
+        print msg
+        sys.exit(1)
+
+    @staticmethod
+    def user_abort(msg='User abort!'):
+        print msg
+        sys.exit(0)
+
+    @staticmethod
+    def undefined_error(msg='Some error has happened!'):
+        print msg
+        sys.exit(1)
 
 
-def get_file(file):
-    fp = open(file)
-    content = fp.read()
-    fp.close()
-    return content
+def get_picture_list(path):
+    assert isinstance(path, str)
 
+    def is_img(url):
+        postfix = url.split('.')[-1].strip()
+        if postfix not in settings.IMG_TYPES:
+            return False
+        return True
 
-def get_picture_url(content, reg, prefix):
+    def get_img_name(url):
+        # TODO: add spec name
+        return url.split('/')[-1].strip()
+
     pic_url_list = []
-    img_re = re.compile(reg)
-    img_list = re.findall(img_re, content)
-    if prefix:
-        for item in img_list:
-            pic_url_list.append({
-                'name': item.split('/')[-1],
-                'url': prefix + item.split('/')[-1],
-            })
-        return pic_url_list
-
-    for item in img_list:
-        pic_url_list.append({
-            'name': item.split('/')[-1],
-            'url': item,
-        })
-
+    try:
+        with open(path, 'r') as f:
+            for url in f:
+                if not is_img(url):
+                    continue
+                name = get_img_name(url)
+                pic_url_list.append({'name': name, 'url': url})
+    except IOError:
+        ErrorHandler.access_error('Can not read the output file!')
     return pic_url_list
 
 
-def print_counting():
-    global count
-    print "%d pictures saved" % count
-    count += 1
+def save_thread(pic_url_list, save_dir):
+    assert isinstance(pic_url_list, list)
+    assert isinstance(save_dir, str)
 
+    def print_counting():
+        global count
+        if count != 0 and count % 10 == 0:
+            print "%d pictures saved" % count
+        count += 1
 
-def save_thread(list, spec_name, save_dir):
-    global pre_spec_name
-
-    for item in list:
+    for item in pic_url_list:
         try:
-            # 'spec_name' stand for specified name of the pictures
-            if spec_name:
-                urllib.urlretrieve(item['url'], save_dir + '%s.jpg' % spec_name + str(pre_spec_name))
-                print_counting()
-                pre_spec_name += 1
-            else:
-                urllib.urlretrieve(item['url'], save_dir + item['name'])
-                print_counting()
+            urllib.urlretrieve(item['url'], save_dir + item['name'].strip())
+            print_counting()
         except IOError:
-            print "You have no permission to save files in the specified path."
-            continue
+            ErrorHandler.access_error('You have no permission to save files in the specified path.')
         except KeyboardInterrupt:
-            print "Download abort, existing..."
-            sys.exit(0)
+            ErrorHandler.user_abort('Download abort, existing...')
 
 
-def save_picture(pic_url_list, spec_name, save_dir):
+def save_picture(pic_url_list, save_dir, jobs):
+    assert isinstance(pic_url_list, list)
+    assert isinstance(save_dir, str)
+    assert isinstance(jobs, int)
 
-    border = len(pic_url_list) / (MAX_THREADING - 1)
-
+    border = len(pic_url_list) / (jobs - 1)
     threads = []
     i = 0
     j = border
     while i < len(pic_url_list):
         t = threading.Thread(target=save_thread,
-                              args=(pic_url_list[i: j], spec_name, save_dir))
+                             args=(pic_url_list[i: j], save_dir))
         threads.append(t)
         i = j
         j += border
@@ -124,56 +97,29 @@ def save_picture(pic_url_list, spec_name, save_dir):
         t.join()
 
 
-def main(opt, url, reg, prefix, file_dir, spec_name, save_dir):
+def main(output, jobs):
+    global count
 
-    if opt == '1':
-        content = get_html_content(url)
-    else:
-        content = get_file(file_dir)
-    pic_url_list = get_picture_url(content, reg, prefix)
-    save_picture(pic_url_list, spec_name, save_dir)
-    print "Completed!"
+    path = os.getcwd() + '/temp/url_temp'
+    pic_url_list = get_picture_list(path)
+    save_picture(pic_url_list, output, jobs)
+    print "Completed! Total %d images" % count
 
 
 if __name__ == '__main__':
 
+    _p_script = 'love_live.js'
+    p_script = os.getcwd() + settings.PhantomJS_PATH + _p_script
+    output = os.getcwd() + settings.DEFAULT_OUTPUT_PATH
+    temp_file = os.getcwd() + settings.TEMP_FILE
+    jobs = 5
+
     try:
-        url = ''
-        file_dir = ''
-        try:
-            from settings import *
-            print "********************************"
-            print "Load setting file successfully."
-            print "********************************"
-        except IOError:
-            print message['opt_msg']
-            opt = raw_input("> ")
-            if opt == '1':
-                print message['url_msg']
-                url = raw_input("> ")
-            elif opt == '2':
-                print message['file_dir_msg']
-                file_dir = raw_input("> ")
-            else:
-                print "Error input!"
-                sys.exit(1)
-
-            if not (url or file_dir):
-                print "Error input!"
-                sys.exit(1)
-
-            print message['reg_msg']
-            reg = r'%s' % raw_input("> ")
-
-            print message['prefix_msg']
-            prefix = raw_input("> ")
-
-            print message['save_dir_msg']
-            save_dir = raw_input("> ")
-
-            print message['spec_name_msg']
-            spec_name = raw_input("> ")
-
-        main(opt, url, reg, prefix, file_dir, spec_name, save_dir)
+        print "Begin to run PhantomJS script..."
+        os.system('phantomjs {script} > {temp_file}'.format(script=p_script, temp_file=temp_file))
+        print "PhantomJS script completed!"
+        main(output, jobs)
     except KeyboardInterrupt:
-        print "Bye."
+        ErrorHandler.user_abort('Bye')
+    except Exception, e:
+        ErrorHandler.undefined_error(str(e))
