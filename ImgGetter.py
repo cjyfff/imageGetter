@@ -1,13 +1,30 @@
 #! /usr/bin/env python
 # coding=utf-8
 # author: cjyfff -- https://github.com/cjyfff
+"""ImgGetter is a crawler to get images with PhantomJS.
+Usage:
+    ImgGetter.py <PhantomJS_script> [-o=<output path>] [-j=<number of threads>]
+
+Examples:
+    ImgGetter.py love_live.js
+    ImgGetter.py love_live.js --output /home/cjyfff/img/
+    ImgGetter.py love_live.js --output /home/cjyfff/img/ -j 5
+
+Options:
+    -h --help     Show this screen.
+    --version     Show version.
+    -o            Assign output path(use absolute path).
+    -j            Assign number of threads.
+"""
 
 import urllib
 import sys
 import threading
 import os
 import settings
+from docopt import docopt
 
+VERSION = 'ImgGetter 0.5.0'
 count = 0
 
 
@@ -70,7 +87,8 @@ def save_thread(pic_url_list, save_dir):
             urllib.urlretrieve(item['url'], save_dir + item['name'].strip())
             print_counting()
         except IOError:
-            ErrorHandler.access_error('You have no permission to save files in the specified path.')
+            ErrorHandler.access_error(
+                'You have no permission to save files in the specified path.')
         except KeyboardInterrupt:
             ErrorHandler.user_abort('Download abort, existing...')
 
@@ -97,8 +115,19 @@ def save_picture(pic_url_list, save_dir, jobs):
         t.join()
 
 
+def normalize(path):
+    assert isinstance(path, str)
+    if not path.startswith('/'):
+        path = '/' + path
+    if not path.endswith('/'):
+        path = path + '/'
+    return path
+
+
 def main(output, jobs):
     global count
+    assert isinstance(output, str)
+    assert isinstance(jobs, int)
 
     path = os.getcwd() + '/temp/url_temp'
     pic_url_list = get_picture_list(path)
@@ -107,12 +136,22 @@ def main(output, jobs):
 
 
 if __name__ == '__main__':
+    arguments = docopt(__doc__, version=VERSION)
+    _p_script = arguments['<PhantomJS_script>']
+    output = arguments['-o']
+    jobs = arguments['-j']
 
-    _p_script = 'love_live.js'
     p_script = os.getcwd() + settings.PhantomJS_PATH + _p_script
-    output = os.getcwd() + settings.DEFAULT_OUTPUT_PATH
+
+    if output:
+        output = normalize(output)
+    else:
+        output = os.getcwd() + settings.DEFAULT_OUTPUT_PATH
+
+    if not jobs:
+        jobs = 4
+
     temp_file = os.getcwd() + settings.TEMP_FILE
-    jobs = 5
 
     try:
         print "Begin to run PhantomJS script..."
