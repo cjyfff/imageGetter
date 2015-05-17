@@ -96,7 +96,7 @@ def save_thread(pic_url_list, save_dir):
 def save_picture(pic_url_list, save_dir, jobs):
     assert isinstance(pic_url_list, list)
     assert isinstance(save_dir, str)
-    assert isinstance(jobs, int)
+    assert isinstance(jobs, int) and not isinstance(jobs, bool)
 
     border = len(pic_url_list) / (jobs - 1)
     threads = []
@@ -127,7 +127,7 @@ def normalize(path):
 def main(output, jobs):
     global count
     assert isinstance(output, str)
-    assert isinstance(jobs, int)
+    assert isinstance(jobs, int) and not isinstance(jobs, bool)
 
     path = os.getcwd() + '/temp/url_temp'
     pic_url_list = get_picture_list(path)
@@ -149,7 +149,7 @@ if __name__ == '__main__':
         output = os.getcwd() + settings.DEFAULT_OUTPUT_PATH
 
     if not jobs:
-        jobs = 4
+        jobs = settings.DEFAULT_THREADING_NUM
 
     temp_file = os.getcwd() + settings.TEMP_FILE
 

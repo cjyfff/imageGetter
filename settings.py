@@ -8,3 +8,5 @@ DEFAULT_OUTPUT_PATH = '/output/'
 PhantomJS_PATH = '/pjs/'
 
 TEMP_FILE = '/temp/url_temp'
+
+DEFAULT_THREADING_NUM = 4
