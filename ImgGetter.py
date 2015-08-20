@@ -1,5 +1,4 @@
 #! /usr/bin/env python
-# coding=utf-8
 # author: cjyfff -- https://github.com/cjyfff
 """ImgGetter is a crawler to get images with PhantomJS.
 Usage:
